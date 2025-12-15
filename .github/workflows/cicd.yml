@@ -6,79 +6,76 @@ on:
       - main
 
 jobs:
-  build-deploy:
-    runs-on: self-hosted   # VERY IMPORTANT
+  build-and-deploy:
+    runs-on: self-hosted   # MUST be self-hosted (your Mac)
 
     steps:
-    # --------------------
-    # Checkout Code
-    # --------------------
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      # -----------------------------
+      # Checkout source code
+      # -----------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # --------------------
-    # Java Setup
-    # --------------------
-    - name: Set up Java 11
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: 11
+      # -----------------------------
+      # Setup Java 11
+      # -----------------------------
+      - name: Set up Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 11
 
-    # --------------------
-    # Maven Build
-    # --------------------
-    - name: Build Maven App
-      working-directory: app
-      run: mvn clean package -DskipTests
+      # -----------------------------
+      # Maven Build
+      # -----------------------------
+      - name: Build Maven Application
+        working-directory: app
+        run: mvn clean package -DskipTests
 
-    # --------------------
-    # SonarQube Analysis
-    # --------------------
-    - name: SonarQube Scan
-      working-directory: app
-      run: |
-        mvn sonar:sonar \
-          -Dsonar.projectKey=maven-app \
-          -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+      # -----------------------------
+      # SonarQube Scan
+      # -----------------------------
+      - name: SonarQube Analysis
+        working-directory: app
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=demo-app \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-    # --------------------
-    # Docker Login
-    # --------------------
-    - name: Docker Login
-      run: |
-        echo "${{ secrets.DOCKER_PASSWORD }}" | docker login \
-        -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      # -----------------------------
+      # Switch Docker to Minikube
+      # -----------------------------
+      - name: Configure Docker for Minikube
+        run: |
+          eval $(minikube docker-env)
 
-    # --------------------
-    # Use Minikube Docker
-    # --------------------
-    - name: Configure Docker for Minikube
-      run: |
-        eval $(minikube docker-env)
+      # -----------------------------
+      # Build Docker Image (LOCAL)
+      # -----------------------------
+      - name: Build Docker Image
+        run: |
+          docker build -t maven-app:latest ./app
 
-    # --------------------
-    # Docker Build
-    # --------------------
-    - name: Build Docker Image
-      run: |
-        docker build -t maven-app:latest ./app
+      # -----------------------------
+      # Deploy Application
+      # -----------------------------
+      - name: Deploy App to Minikube
+        run: |
+          kubectl apply -f k8s/app/deployment.yaml
+          kubectl apply -f k8s/app/service.yaml
 
-    # --------------------
-    # Deploy Application
-    # --------------------
-    - name: Deploy App to Minikube
-      run: |
-        kubectl apply -f k8s/app/deployment.yaml
-        kubectl apply -f k8s/app/service.yaml
+      # -----------------------------
+      # Deploy Prometheus
+      # -----------------------------
+      - name: Deploy Prometheus
+        run: |
+          kubectl apply -f k8s/prometheus/
 
-    # --------------------
-    # Deploy Monitoring
-    # --------------------
-    - name: Deploy Prometheus
-      run: kubectl apply -f k8s/prometheus/
+      # -----------------------------
+      # Deploy Grafana
+      # -----------------------------
+      - name: Deploy Grafana
+        run: |
+          kubectl apply -f k8s/grafana/
 
-    - name: Deploy Grafana
-      run: kubectl apply -f k8s/grafana/
-#### testing

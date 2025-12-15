@@ -13,8 +13,9 @@ spec:
         app: demo-app
     spec:
       containers:
-      - name: demo-app
-        image: dockerhub-username/demo-app:latest
-        ports:
-        - containerPort: 8080
+        - name: demo-app
+          image: maven-app:latest
+          imagePullPolicy: Never   # 🔑 CRITICAL for local Minikube
+          ports:
+            - containerPort: 8080
 
